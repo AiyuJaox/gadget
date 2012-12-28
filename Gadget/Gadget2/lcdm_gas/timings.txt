@@ -1,0 +1,56 @@
+Step= 0  t= 0.0909091  dt= 0 
+Nf= 0000065536  total-Nf= 0000065536  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.7625 avg=0.7625 PE0=0.7625
+particle-load balance: 1
+max. nodes: 29807, filled: 0.355329
+part/sec=85948.8 | 85948.8  ia/part=51.2403 (0)
+
+Step= 0  t= 0.0909091  dt= 0 
+Nf= 0000065536  total-Nf= 0000131072  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.831317 avg=0.831317 PE0=0.831317
+particle-load balance: 1
+max. nodes: 29807, filled: 0.355329
+part/sec=78834 | 78834  ia/part=55.6069 (0)
+
+Step= 1  t= 0.0926282  dt= 0.0017191 
+Nf= 0000065536  total-Nf= 0000196608  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.833257 avg=0.833257 PE0=0.833257
+particle-load balance: 1
+max. nodes: 29723, filled: 0.354328
+part/sec=78650.4 | 78650.4  ia/part=55.6652 (0)
+
+Step= 2  t= 0.0943798  dt= 0.00175161 
+Nf= 0000065536  total-Nf= 0000262144  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.836188 avg=0.836188 PE0=0.836188
+particle-load balance: 1
+max. nodes: 29652, filled: 0.353481
+part/sec=78374.7 | 78374.7  ia/part=55.6816 (0)
+
+Step= 3  t= 0.0961645  dt= 0.00178473 
+Nf= 0000065536  total-Nf= 0000327680  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.83194 avg=0.83194 PE0=0.83194
+particle-load balance: 1
+max. nodes: 29571, filled: 0.352516
+part/sec=78774.9 | 78774.9  ia/part=55.7079 (0)
+
+Step= 4  t= 0.097983  dt= 0.00181848 
+Nf= 0000065536  total-Nf= 0000393216  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.837159 avg=0.837159 PE0=0.837159
+particle-load balance: 1
+max. nodes: 29505, filled: 0.351729
+part/sec=78283.8 | 78283.8  ia/part=55.7315 (0)
+
+Step= 5  t= 0.0998359  dt= 0.00185287 
+Nf= 0000065536  total-Nf= 0000458752  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.831526 avg=0.831526 PE0=0.831526
+particle-load balance: 1
+max. nodes: 29390, filled: 0.350358
+part/sec=78814.1 | 78814.1  ia/part=55.7701 (0)
+
+Step= 6  t= 0.101724  dt= 0.00188791 
+Nf= 0000065536  total-Nf= 0000524288  ex-frac= 0  iter= 1
+work-load balance: 1  max=0.831261 avg=0.831261 PE0=0.831261
+particle-load balance: 1
+max. nodes: 29267, filled: 0.348892
+part/sec=78839.2 | 78839.2  ia/part=55.7998 (0)
+

@@ -1,0 +1,14 @@
+
+Begin Step 0, Time: 0.0909091, Redshift: 10, Systemstep: 0, Dloga: 0
+
+Begin Step 1, Time: 0.0926282, Redshift: 9.79585, Systemstep: 0.0017191, Dloga: 0.0187336
+
+Begin Step 2, Time: 0.0943798, Redshift: 9.59549, Systemstep: 0.00175161, Dloga: 0.0187336
+
+Begin Step 3, Time: 0.0961645, Redshift: 9.39884, Systemstep: 0.00178473, Dloga: 0.0187336
+
+Begin Step 4, Time: 0.097983, Redshift: 9.20585, Systemstep: 0.00181848, Dloga: 0.0187336
+
+Begin Step 5, Time: 0.0998359, Redshift: 9.01644, Systemstep: 0.00185287, Dloga: 0.0187336
+
+Begin Step 6, Time: 0.101724, Redshift: 8.83054, Systemstep: 0.00188791, Dloga: 0.0187336

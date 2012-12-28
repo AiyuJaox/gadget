@@ -102,12 +102,12 @@ ifeq ($(SYSTYPE),"MPA")
 CC       =  mpicc   
 OPTIMIZE =  -O3 -Wall
 GSL_INCL =  -I/usr/common/pdsoft/include
-GSL_LIBS =  -L/usr/common/pdsoft/lib  -Wl,"-R /usr/common/pdsoft/lib"
-FFTW_INCL= 
-FFTW_LIBS= 
+GSL_LIBS =  -L/usr/common/pdsoft/lib #-static #-Wl,"-R /usr/common/pdsoft/lib"
+FFTW_INCL= -I/Users/fandorin/git/fftw-2/include/
+FFTW_LIBS= -L/Users/fandorin/git/fftw-2/lib/
 MPICHLIB =
-HDF5INCL =  
-HDF5LIB  =  -lhdf5 -lz 
+HDF5INCL = -I/opt/local/include  
+HDF5LIB  = -L/opt/local/lib -lhdf5 
 endif
 
 
@@ -201,8 +201,10 @@ endif
 
 
 ifneq (HAVE_HDF5,$(findstring HAVE_HDF5,$(OPT))) 
-HDF5INCL =
-HDF5LIB  =
+HDF5INCL = -I/opt/local/include/
+HDF5LIB  = -lhdf5 -lz
+FFTW_INCL= /usr/local/include/ 
+FFTW_LIBS=
 endif
 
 
@@ -222,7 +224,7 @@ OBJS   = main.o  run.o  predict.o begrun.o endrun.o global.o  \
 INCL   = allvars.h  proto.h  tags.h  Makefile
 
 
-CFLAGS = $(OPTIONS) $(GSL_INCL) $(FFTW_INCL) $(HDF5INCL)
+CFLAGS = $(OPTIONS) $(GSL_INCL) $(FFTW_INCL) $(HDF5INCL) -static
 
 
 ifeq (NOTYPEPREFIX_FFTW,$(findstring NOTYPEPREFIX_FFTW,$(OPT)))    # fftw installed with type prefix?
