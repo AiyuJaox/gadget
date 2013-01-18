@@ -189,8 +189,9 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
  *  variable startnode which start search base algorithm. 
 */
 void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target) {
-  int k, f;
+  int k, f, prev;
   FLOAT searchmin[3], searchmax[3];
+  struct NODE *this;
 
 #ifdef PERIODIC
   double xtmp;
@@ -201,12 +202,17 @@ void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
       searchmin[k] = searchcenter[k] - hsml;
       searchmax[k] = searchcenter[k] + hsml;
     }
-
-  if (target < All.MaxPart) {
   
+  prev = target;
+  if (target <= All.MaxPart) {
     f = Father[target];
-
-    while (f < All.MaxPart) {
+  } else {
+    f = Nodes[target].u.d.father;
+  }
+    
+  while (f > 0) {
+    
+    if (f <= All.MaxPart) { 
 #ifdef PERIODIC
           if(NGB_PERIODIC_X(P[f].Pos[0] - searchcenter[0]) < -hsml)
             break;
@@ -234,18 +240,52 @@ void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
           if(P[f].Pos[2] > searchmax[2])
             break;
 #endif
-        
+    } else {
+        this = &Nodes[f];
+#ifdef PERIODIC
+          if((NGB_PERIODIC_X(this->center[0] - searchcenter[0]) + 0.5 * this->len) < -hsml)
+            break;
+          if((NGB_PERIODIC_X(this->center[0] - searchcenter[0]) - 0.5 * this->len) > hsml)
+            break;
+          if((NGB_PERIODIC_Y(this->center[1] - searchcenter[1]) + 0.5 * this->len) < -hsml)
+            break;
+          if((NGB_PERIODIC_Y(this->center[1] - searchcenter[1]) - 0.5 * this->len) > hsml)
+            break;
+          if((NGB_PERIODIC_Z(this->center[2] - searchcenter[2]) + 0.5 * this->len) < -hsml)
+            break;
+          if((NGB_PERIODIC_Z(this->center[2] - searchcenter[2]) - 0.5 * this->len) > hsml)
+            break;
+#else
+          if((this->center[0] + 0.5 * this->len) < (searchmin[0]))
+            break;
+          if((this->center[0] - 0.5 * this->len) > (searchmax[0]))
+            break;
+          if((this->center[1] + 0.5 * this->len) < (searchmin[1]))
+            break;
+          if((this->center[1] - 0.5 * this->len) > (searchmax[1]))
+            break;
+          if((this->center[2] + 0.5 * this->len) < (searchmin[2]))
+            break;
+          if((this->center[2] - 0.5 * this->len) > (searchmax[2]))
+            break;
+#endif
+
+    }
+
+    prev = f;  
+    if (f <= All.MaxPart) {
       f = Father[f];
+    } else {
+      f = Nodes[f].u.d.father;
     }
-
-    if (f > All.MaxPart) {
-      f = All.MaxPart;
-    }
-
-    *startnode = f;
-
   }
-  
+
+  if (target == prev) {
+    prev = All.MaxPart;
+  }
+ 
+  *startnode = prev;
+ 
 }
 
 
