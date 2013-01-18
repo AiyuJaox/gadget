@@ -459,7 +459,6 @@ void density(void)
 }
 
 
-
 /*! This function represents the core of the SPH density computation. The
  *  target particle may either be local, or reside in the communication
  *  buffer.
@@ -502,8 +501,10 @@ void density_evaluate(int target, int mode)
 
   startnode = All.MaxPart;
   numngb = 0;
+
   do
     {
+      ngb_search_startnode(&pos[0], h, &startnode, target);
       numngb_inbox = ngb_treefind_variable(&pos[0], h, &startnode);
 
       for(n = 0; n < numngb_inbox; n++)

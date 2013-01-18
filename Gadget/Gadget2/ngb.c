@@ -184,6 +184,70 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
   return numngb;
 }
 
+/*! This function walk up by father's nodes while geometrical center 
+ *  of this nodes far target center plus hsml. It's function modified
+ *  variable startnode which start search base algorithm. 
+*/
+void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target) {
+  int k, f;
+  FLOAT searchmin[3], searchmax[3];
+
+#ifdef PERIODIC
+  double xtmp;
+#endif
+
+  for(k = 0; k < 3; k++)        /* cube-box window */
+    {
+      searchmin[k] = searchcenter[k] - hsml;
+      searchmax[k] = searchcenter[k] + hsml;
+    }
+
+  if (target < All.MaxPart) {
+  
+    f = Father[target];
+
+    while (f < All.MaxPart) {
+#ifdef PERIODIC
+          if(NGB_PERIODIC_X(P[f].Pos[0] - searchcenter[0]) < -hsml)
+            break;
+          if(NGB_PERIODIC_X(P[f].Pos[0] - searchcenter[0]) > hsml)
+            break;
+          if(NGB_PERIODIC_Y(P[f].Pos[1] - searchcenter[1]) < -hsml)
+            break;
+          if(NGB_PERIODIC_Y(P[f].Pos[1] - searchcenter[1]) > hsml)
+            break;
+          if(NGB_PERIODIC_Z(P[f].Pos[2] - searchcenter[2]) < -hsml)
+            break;
+          if(NGB_PERIODIC_Z(P[f].Pos[2] - searchcenter[2]) > hsml)
+            break;
+#else
+          if(P[f].Pos[0] < searchmin[0])
+            break;
+          if(P[f].Pos[0] > searchmax[0])
+            break;
+          if(P[f].Pos[1] < searchmin[1])
+            break;
+          if(P[f].Pos[1] > searchmax[1])
+            break;
+          if(P[f].Pos[2] < searchmin[2])
+            break;
+          if(P[f].Pos[2] > searchmax[2])
+            break;
+#endif
+        
+      f = Father[f];
+    }
+
+    if (f > All.MaxPart) {
+      f = All.MaxPart;
+    }
+
+    *startnode = f;
+
+  }
+  
+}
+
 
 
 /*! This function returns neighbours with distance <= hsml and returns them in

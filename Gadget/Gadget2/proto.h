@@ -139,6 +139,7 @@ void   ngb_treeallocate(int npart);
 void   ngb_treebuild(void);
 int    ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode);
 int    ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hguess, int *startnode);
+void   ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target);
 void   ngb_treefree(void);
 void   ngb_treesearch(int);
 void   ngb_treesearch_pairs(int);
