@@ -505,9 +505,11 @@ void density_evaluate(int target, int mode)
   do
     {
      
-      ngb_search_startnode(&pos[0], h, &startnode, target);
+#ifdef BOTTOM_UP_WALK
+      ngb_search_startnode_variable(&pos[0], h, &startnode, target);
+#endif      
       numngb_inbox = ngb_treefind_variable(&pos[0], h, &startnode);
-
+      
       for(n = 0; n < numngb_inbox; n++)
 	{
 	  j = Ngblist[n];

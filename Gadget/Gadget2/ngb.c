@@ -48,7 +48,120 @@ static double boxSize_Z, boxHalf_Z;
 #define NGB_PERIODIC_Y(x) (xtmp=(x),(xtmp>boxHalf_Y)?(xtmp-boxSize_Y):((xtmp<-boxHalf_Y)?(xtmp+boxSize_Y):xtmp))
 #define NGB_PERIODIC_Z(x) (xtmp=(x),(xtmp>boxHalf_Z)?(xtmp-boxSize_Z):((xtmp<-boxHalf_Z)?(xtmp+boxSize_Z):xtmp))
 
+#ifdef BOTTOM_UP_WALK
+/*! This function walk up by father's nodes while geometrical center
+ *  of this nodes far target center plus hsml. It's function modified
+ *  variable startnode which start search base algorithm.
+*/
+void ngb_search_startnode_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target) {
+  int k, f, prev;
+  FLOAT hdiff;
+  FLOAT searchmin[3], searchmax[3];
+  struct NODE *this;
 
+#ifdef PERIODIC
+  double xtmp;
+#endif
+
+  for(k = 0; k < 3; k++)        /* cube-box window */
+    {
+      searchmin[k] = searchcenter[k] - hsml;
+      searchmax[k] = searchcenter[k] + hsml;
+    }
+ 
+  prev = target;
+  if (target <= All.MaxPart) {
+    f = Father[target];
+  } else {
+    f = Nodes[target].u.d.father;
+  }
+   
+  while (f > 0) {
+
+    if (f <= All.MaxPart) {
+      hdiff = SphP[f].Hsml - hsml;
+      if(hdiff < 0) {
+        hdiff = 0;
+      }
+#ifdef PERIODIC
+          if(NGB_PERIODIC_X(P[f].Pos[0] - searchcenter[0]) < (-hsml - hdiff))
+            break;
+          if(NGB_PERIODIC_X(P[f].Pos[0] - searchcenter[0]) > (hsml + hdiff))
+            break;
+          if(NGB_PERIODIC_Y(P[f].Pos[1] - searchcenter[1]) < (-hsml - hdiff))
+            break;
+          if(NGB_PERIODIC_Y(P[f].Pos[1] - searchcenter[1]) > (hsml + hdiff))
+            break;
+          if(NGB_PERIODIC_Z(P[f].Pos[2] - searchcenter[2]) < (-hsml - hdiff))
+            break;
+          if(NGB_PERIODIC_Z(P[f].Pos[2] - searchcenter[2]) > (hsml + hdiff))
+            break;
+#else
+          if(P[f].Pos[0] < (searchmin[0] - hdiff))
+            break;
+          if(P[f].Pos[0] > (searchmax[0] + hdiff))
+            break;
+          if(P[f].Pos[1] < (searchmin[1] - hdiff))
+            break;
+          if(P[f].Pos[1] > (searchmax[1] + hdiff))
+            break;
+          if(P[f].Pos[2] < (searchmin[2] - hdiff))
+            break;
+          if(P[f].Pos[2] > (searchmax[2] + hdiff))
+            break;
+#endif    
+
+    } else {
+      this = &Nodes[f];
+      hdiff = Extnodes[f].hmax - hsml;
+      if(hdiff < 0) {
+        hdiff = 0;
+      }
+#ifdef PERIODIC
+          if((NGB_PERIODIC_X(this->center[0] - searchcenter[0]) + 0.5 * this->len) < (-hsml - hdiff))
+            break;
+          if((NGB_PERIODIC_X(this->center[0] - searchcenter[0]) - 0.5 * this->len) > (hsml + hdiff))
+            break;
+          if((NGB_PERIODIC_Y(this->center[1] - searchcenter[1]) + 0.5 * this->len) < (-hsml - hdiff))
+            break;
+          if((NGB_PERIODIC_Y(this->center[1] - searchcenter[1]) - 0.5 * this->len) > (hsml + hdiff))
+            break;
+          if((NGB_PERIODIC_Z(this->center[2] - searchcenter[2]) + 0.5 * this->len) < (-hsml - hdiff))
+            break;
+          if((NGB_PERIODIC_Z(this->center[2] - searchcenter[2]) - 0.5 * this->len) > (hsml + hdiff))
+            break;
+#else
+          if((this->center[0] + 0.5 * this->len) < (searchmin[0] - hdiff))
+            continue;
+          if((this->center[0] - 0.5 * this->len) > (searchmax[0] + hdiff))
+            continue;
+          if((this->center[1] + 0.5 * this->len) < (searchmin[1] - hdiff))
+            continue;
+          if((this->center[1] - 0.5 * this->len) > (searchmax[1] + hdiff))
+            continue;
+          if((this->center[2] + 0.5 * this->len) < (searchmin[2] - hdiff))
+            continue;
+          if((this->center[2] - 0.5 * this->len) > (searchmax[2] + hdiff))
+            continue;
+#endif
+    }
+
+    prev = f;
+    if (f <= All.MaxPart) {
+      f = Father[f];
+    } else {
+      f = Nodes[f].u.d.father;
+    }
+  }
+
+  if (target == prev) {
+    prev = All.MaxPart;
+  }
+
+  *startnode = f;//prev;
+
+}
+#endif
 
 /*! This routine finds all neighbours `j' that can interact with the
  *  particle `i' in the communication buffer.
@@ -184,11 +297,12 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
   return numngb;
 }
 
+#ifdef BOTTOM_UP_WALK
 /*! This function walk up by father's nodes while geometrical center 
  *  of this nodes far target center plus hsml. It's function modified
  *  variable startnode which start search base algorithm. 
 */
-void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target) {
+void ngb_search_startnode_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target) {
   int k, f, prev;
   FLOAT searchmin[3], searchmax[3];
   struct NODE *this;
@@ -284,10 +398,10 @@ void ngb_search_startnode(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
     prev = All.MaxPart;
   }
  
-  *startnode = prev;
+  *startnode = f;//prev;
  
 }
-
+#endif
 
 
 /*! This function returns neighbours with distance <= hsml and returns them in
