@@ -26,6 +26,11 @@
 static int last;
 
 
+#ifdef GRAV_LIST_CACHE
+#define GRAV_CACHE_GET_FLAG(ii,jj,kk) ((GravlistCache[(kk) + ((jj)>>5)] & (1 << ( (jj) & ((1UL<<32)-1)))) > 0)
+#define GRAV_CACHE_SET_FLAG(ii,jj) {GravlistCache[(jj) * GravMpart + ((ii)>>5)] |= (1 << ((ii) & ((1UL<<32)-1)));}
+#define GRAV_CACHE_CLEAR_FLAG(ii,jj,kk) {GravlistCache[(kk) + ((jj)>>5)] &= (~(1 << ((jj) & ((1UL<<32)-1))));}
+#endif
 
 /*! length of lock-up table for short-range force kernel in TreePM algorithm */
 #define NTAB 1000
@@ -60,13 +65,22 @@ static double fac_intp;
  */
 int force_treebuild(int npart)
 {
-  Numnodestree = force_treebuild_single(npart);
+  double t0, t1;
 
+  t0 = second();
+  Numnodestree = force_treebuild_single(npart);
+  //t1 = second();
+  //printf("Time treebuild: %f\n", t1-t0);
+
+  
   force_update_pseudoparticles();
 
   force_flag_localnodes();
 
   TimeOfLastTreeConstruction = All.Time;
+
+  t1 = second();
+  printf("Time treebuild: %f\n", t1-t0);
 
   return Numnodestree;
 }
@@ -1431,6 +1445,9 @@ int force_treeevaluate_shortrange(int target, int mode)
 #ifdef ADAPTIVE_GRAVSOFT_FORGAS
   double soft = 0;
 #endif
+#ifdef GRAV_LIST_CACHE
+  int prev;
+#endif
 #ifdef PERIODIC
   double boxsize, boxhalf;
 
@@ -1492,11 +1509,19 @@ int force_treeevaluate_shortrange(int target, int mode)
   h3_inv = h_inv * h_inv * h_inv;
 #endif
   no = All.MaxPart;		/* root node */
-
+#ifdef GRAV_LIST_CACHE
+  int offset = target * GravMpart;
+  prev = no;
+#endif
+ 
   while(no >= 0)
     {
       if(no < All.MaxPart)
 	{
+          
+#ifdef GRAV_LIST_CACHE
+          if (!GRAV_CACHE_GET_FLAG(target, no, offset)) {
+#endif    
 	  /* the index of the node is the index of the particle */
 	  dx = P[no].Pos[0] - pos_x;
 	  dy = P[no].Pos[1] - pos_y;
@@ -1532,6 +1557,15 @@ int force_treeevaluate_shortrange(int target, int mode)
 	    h = All.ForceSoftening[P[no].Type];
 #endif
 #endif
+          
+#ifdef GRAV_LIST_CACHE
+          } else {
+            prev = no;
+            no = Nextnode[no];
+            continue;
+          }
+          prev = no;
+#endif        
 	  no = Nextnode[no];
 	}
       else			/* we have an  internal node */
@@ -1724,11 +1758,15 @@ int force_treeevaluate_shortrange(int target, int mode)
 	  acc_x += dx * fac;
 	  acc_y += dy * fac;
 	  acc_z += dz * fac;
-
 	  ninteractions++;
-	}
+#ifdef GRAV_LIST_CACHE
+	} else {
+          if (prev < All.MaxPart) { 
+            GRAV_CACHE_SET_FLAG(target, prev);   
+          }
+#endif
+        }
     }
-
 
   /* store result at the proper place */
   if(mode == 0)
@@ -2664,7 +2702,7 @@ void force_treeallocate(int maxnodes, int maxpart)
       first_flag = 1;
 
       if(ThisTask == 0)
-	printf("\nAllocated %g MByte for BH-tree. %d\n\n", allbytes / (1024.0 * 1024.0),
+	printf("\nAllocated %g MByte for BH-tree. %ld\n\n", allbytes / (1024.0 * 1024.0),
 	       sizeof(struct NODE) + sizeof(struct extNODE));
 
       tabfac = NTAB / 3.0;

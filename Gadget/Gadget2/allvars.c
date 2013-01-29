@@ -31,6 +31,16 @@ char *Exportflag;        /*!< Buffer used for flagging whether a particle needs 
 
 int  *Ngblist;           /*!< Buffer to hold indices of neighbours retrieved by the neighbour search routines */
 
+#ifdef NGB_LIST_CACHE
+int *NgblistCache;      /*!< Buffer to hold indices of neighbours retrieved by the neighbour search routines, cache neighbours */
+int NgbMpart = 0;
+#endif
+
+#ifdef GRAV_LIST_CACHE
+int *GravlistCache;    /*!< Buffer to hold indices of particles retrieved by the gravitational interaction routines */
+int GravMpart = 0;
+#endif
+
 int TreeReconstructFlag; /*!< Signals that a new tree needs to be constructed */
 
 int Flag_FullStep;       /*!< This flag signals that the current step involves all particles */

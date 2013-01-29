@@ -60,6 +60,10 @@ void gravity_tree(void)
 
       force_treebuild(NumPart);
 
+#ifdef GRAV_LIST_CACHE
+      memset(GravlistCache, 0, All.MaxPart * GravMpart);
+#endif
+
       TreeReconstructFlag = 0;
 
       if(ThisTask == 0)
@@ -78,10 +82,13 @@ void gravity_tree(void)
   free(numlist);
 
 
+  double t0, t1;
+
+  t0 = second();
+
 #ifndef NOGRAVITY
   if(ThisTask == 0)
     printf("Begin tree force.\n");
-
 
 #ifdef SELECTIVE_NO_GRAVITY
   for(i = 0; i < NumPart; i++)
@@ -89,16 +96,15 @@ void gravity_tree(void)
       P[i].Ti_endstep = -P[i].Ti_endstep - 1;
 #endif
 
-
   noffset = malloc(sizeof(int) * NTask);	/* offsets of bunches in common list */
   nbuffer = malloc(sizeof(int) * NTask);
   nsend_local = malloc(sizeof(int) * NTask);
   nsend = malloc(sizeof(int) * NTask * NTask);
   ndonelist = malloc(sizeof(int) * NTask);
 
+
   i = 0;			/* beginn with this index */
   ntotleft = ntot;		/* particles left for all tasks together */
-
   while(ntotleft > 0)
     {
       iter++;
@@ -145,6 +151,8 @@ void gravity_tree(void)
 	  }
       tend = second();
       timetree += timediff(tstart, tend);
+
+      printf("Time tree force loop...: %f\n", tend-tstart); 
 
       qsort(GravDataIndexTable, nexport, sizeof(struct gravdata_index), grav_tree_compare_key);
 
@@ -285,7 +293,7 @@ void gravity_tree(void)
   free(nsend_local);
   free(nbuffer);
   free(noffset);
-
+  
   /* now add things for comoving integration */
 
 #ifndef PERIODIC
@@ -352,6 +360,9 @@ void gravity_tree(void)
 
   if(ThisTask == 0)
     printf("tree is done.\n");
+
+  t1 = second();
+  printf("Time tree force: %f\n", t1-t0);
 
 #else /* gravity is switched off */
 

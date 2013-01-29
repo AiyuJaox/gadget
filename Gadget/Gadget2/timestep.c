@@ -371,6 +371,7 @@ void advance_and_find_timesteps(void)
       All.PM_Ti_begstep = All.PM_Ti_endstep;
       All.PM_Ti_endstep = All.PM_Ti_begstep + ti_step;
 
+
       if(All.ComovingIntegrationOn)
 	dt_gravkickB = -get_gravkick_factor(All.PM_Ti_begstep, (All.PM_Ti_begstep + All.PM_Ti_endstep) / 2);
       else

@@ -82,7 +82,7 @@ void domain_Decomposition(void)
 #endif
       All.NumForcesSinceLastDomainDecomp = 0;
       TreeReconstructFlag = 1;	/* ensures that new tree will be constructed */
-
+      
       if(ThisTask == 0)
 	{
 	  printf("domain decomposition... \n");

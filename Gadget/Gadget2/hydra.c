@@ -410,7 +410,7 @@ void hydro_evaluate(int target, int mode)
 #ifdef BOTTOM_UP_WALK
       ngb_search_startnode_pairs(&pos[0], h_i, &startnode, target);
 #endif      
-      numngb = ngb_treefind_pairs(&pos[0], h_i, &startnode);
+      numngb = ngb_treefind_pairs(&pos[0], h_i, &startnode, target);
 
       for(n = 0; n < numngb; n++)
 	{

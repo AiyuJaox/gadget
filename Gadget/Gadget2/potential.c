@@ -55,7 +55,7 @@ void compute_potential(void)
       force_treebuild(NumPart);
 
       TreeReconstructFlag = 0;
-
+      
       if(ThisTask == 0)
 	printf("Tree construction done.\n");
     }

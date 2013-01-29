@@ -88,7 +88,7 @@ typedef  long long  peanokey;    /*!< defines the variable type used for Peano-H
                          which short-range forces are evaluated in the short-range tree walk. */
 #endif
 
-#define MAX_NGB             20000  /*!< defines maximum length of neighbour list */
+#define MAX_NGB             5000  /*!< defines maximum length of neighbour list */
 
 #define MAXLEN_OUTPUTLIST   500	   /*!< maxmimum number of entries in list of snapshot output times */
 
@@ -149,7 +149,23 @@ extern char *Exportflag;        /*!< Buffer used for flagging whether a particle
 
 extern int  *Ngblist;           /*!< Buffer to hold indices of neighbours retrieved by the neighbour search routines */
 
+#ifdef NGB_LIST_CACHE
+extern int *NgblistCache;      /*!< Buffer to hold indices of neighbours retrieved by the neighbour search routines, 
+                                     saved for all particles*/
+extern int NgbMpart;      /*!< Number of neighbors in bits represents */
+#endif
+
+#ifdef GRAV_LIST_CACHE
+extern int *GravlistCache;      /*!< Buffer to hold indices of particles retrieved by the gravitational interaction routines */
+extern int GravMpart;      /*!< Number of particles in bits represents */
+#endif
+
+
 extern int TreeReconstructFlag; /*!< Signals that a new tree needs to be constructed */
+
+#ifdef NGB_LIST_CACHE
+extern int NgblistCacheReconstructFlag; /*! Signals that a new ngb list cache to be constructed */ 
+#endif
 
 extern int Flag_FullStep;       /*!< This flag signals that the current step involves all particles */
 

@@ -33,6 +33,7 @@ void run(void)
     {
       t0 = second();
 
+
       find_next_sync_point_and_drift();	/* find next synchronization point and drift particles to this time.
 					 * If needed, this function will also write an output file
 					 * at the desired time.
@@ -128,6 +129,7 @@ void run(void)
 
       All.CPU_Total += timediff(t0, t1);
       CPUThisRun += timediff(t0, t1);
+
     }
   while(All.Ti_Current < TIMEBASE && All.Time <= All.TimeMax);
 

@@ -70,7 +70,13 @@ OPT   +=  -DHAVE_HDF5
 #OPT   +=  -DMAKEGLASS=262144
 
 #--------------------------------------- Bottom-up walking through tree
-OPT   +=  -DBOTTOM_UP_WALK
+#OPT   +=  -DBOTTOM_UP_WALK
+
+#--------------------------------------- Ngb list for cache
+#OPT   +=  -DNGB_LIST_CACHE
+
+#--------------------------------------- Grav list for cache
+OPT   +=  -DGRAV_LIST_CACHE
 
 #----------------------------------------------------------------------
 # Here, select compile environment for the target machine. This may need 

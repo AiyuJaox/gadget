@@ -48,6 +48,13 @@ static double boxSize_Z, boxHalf_Z;
 #define NGB_PERIODIC_Y(x) (xtmp=(x),(xtmp>boxHalf_Y)?(xtmp-boxSize_Y):((xtmp<-boxHalf_Y)?(xtmp+boxSize_Y):xtmp))
 #define NGB_PERIODIC_Z(x) (xtmp=(x),(xtmp>boxHalf_Z)?(xtmp-boxSize_Z):((xtmp<-boxHalf_Z)?(xtmp+boxSize_Z):xtmp))
 
+#ifdef NGB_LIST_CACHE
+#define NGB_CACHE_GET_FLAG(i,j,k) (!(NgblistCache[(k) + ((j)>>5)] & (1 << ( (j) & ((1UL<<32)-1)))) && (j) > (i))
+#define NGB_CACHE_SET_FLAG(i,j) {NgblistCache[(j) * NgbMpart + ((i)>>5)] |= (1 << ((i) & ((1UL<<32)-1)));}
+#define NGB_CACHE_CLEAR_FLAG(i,j,k) {NgblistCache[(k) + ((j)>>5)] &= (~(1 << ((j) & ((1UL<<32)-1))));}
+#endif
+
+
 #ifdef BOTTOM_UP_WALK
 /*! This function walk up by father's nodes while geometrical center
  *  of this nodes far target center plus hsml. It's function modified
@@ -132,17 +139,17 @@ void ngb_search_startnode_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnod
             break;
 #else
           if((this->center[0] + 0.5 * this->len) < (searchmin[0] - hdiff))
-            continue;
+            break;
           if((this->center[0] - 0.5 * this->len) > (searchmax[0] + hdiff))
-            continue;
+            break;
           if((this->center[1] + 0.5 * this->len) < (searchmin[1] - hdiff))
-            continue;
+            beak;
           if((this->center[1] - 0.5 * this->len) > (searchmax[1] + hdiff))
-            continue;
+            break;
           if((this->center[2] + 0.5 * this->len) < (searchmin[2] - hdiff))
-            continue;
+            break;
           if((this->center[2] - 0.5 * this->len) > (searchmax[2] + hdiff))
-            continue;
+            break;
 #endif
     }
 
@@ -174,7 +181,7 @@ void ngb_search_startnode_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnod
  *  difficult) second part of it. For this purpose, each node knows the
  *  maximum h occuring among the particles it represents.
  */
-int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
+int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target)
 {
   int k, no, p, numngb;
   FLOAT hdiff;
@@ -183,6 +190,10 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 
 #ifdef PERIODIC
   double xtmp;
+#endif
+
+#ifdef NGB_LIST_CACHE
+  int offset;
 #endif
 
   for(k = 0; k < 3; k++)	/* cube-box window */
@@ -194,6 +205,10 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
   numngb = 0;
   no = *startnode;
 
+#ifdef NGB_LIST_CACHE
+  offset = target * NgbMpart;
+#endif
+
   while(no >= 0)
     {
       if(no < All.MaxPart)	/* single particle */
@@ -204,38 +219,50 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 	  if(P[p].Type > 0)
 	    continue;
 
-	  hdiff = SphP[p].Hsml - hsml;
-	  if(hdiff < 0)
-	    hdiff = 0;
+#ifdef NGB_LIST_CACHE
+          if NGB_CACHE_GET_FLAG(target, p, offset) {
+#endif
+
+  	    hdiff = SphP[p].Hsml - hsml;
+	    if(hdiff < 0)
+	      hdiff = 0;
 
 #ifdef PERIODIC
-	  if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) < (-hsml - hdiff))
-	    continue;
-	  if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) > (hsml + hdiff))
-	    continue;
-	  if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) < (-hsml - hdiff))
-	    continue;
-	  if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) > (hsml + hdiff))
-	    continue;
-	  if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) < (-hsml - hdiff))
-	    continue;
-	  if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) > (hsml + hdiff))
-	    continue;
+	    if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) < (-hsml - hdiff))
+	      continue;
+	    if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) > (hsml + hdiff))
+	      continue;
+	    if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) < (-hsml - hdiff))
+	      continue;
+	    if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) > (hsml + hdiff))
+	      continue;
+	    if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) < (-hsml - hdiff))
+	      continue;
+	    if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) > (hsml + hdiff))
+	      continue;
 #else
-	  if(P[p].Pos[0] < (searchmin[0] - hdiff))
-	    continue;
-	  if(P[p].Pos[0] > (searchmax[0] + hdiff))
-	    continue;
-	  if(P[p].Pos[1] < (searchmin[1] - hdiff))
-	    continue;
-	  if(P[p].Pos[1] > (searchmax[1] + hdiff))
-	    continue;
-	  if(P[p].Pos[2] < (searchmin[2] - hdiff))
-	    continue;
-	  if(P[p].Pos[2] > (searchmax[2] + hdiff))
-	    continue;
+	    if(P[p].Pos[0] < (searchmin[0] - hdiff))
+	      continue;
+	    if(P[p].Pos[0] > (searchmax[0] + hdiff))
+	      continue;
+	    if(P[p].Pos[1] < (searchmin[1] - hdiff))
+	      continue;
+	    if(P[p].Pos[1] > (searchmax[1] + hdiff))
+	      continue;
+	    if(P[p].Pos[2] < (searchmin[2] - hdiff))
+	      continue;
+	    if(P[p].Pos[2] > (searchmax[2] + hdiff))
+	      continue;
 #endif
-	  Ngblist[numngb++] = p;
+	    Ngblist[numngb++] = p;
+
+#ifdef NGB_LIST_CACHE
+            NGB_CACHE_SET_FLAG(target, p);
+          } else {
+            NGB_CACHE_CLEAR_FLAG(target, p, offset);
+            Ngblist[numngb++] = p;
+          }
+#endif
 
 	  if(numngb == MAX_NGB)
 	    {
@@ -409,7 +436,7 @@ void ngb_search_startnode_variable(FLOAT searchcenter[3], FLOAT hsml, int *start
  *  returned, i.e. the reduction to a sphere still needs to be done in the
  *  calling routine.
  */
-int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
+int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int target)
 {
   int k, numngb;
   int no, p;
@@ -418,6 +445,10 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 
 #ifdef PERIODIC
   double xtmp;
+#endif
+
+#ifdef NGB_LIST_CACHE
+  int offset;
 #endif
 
   for(k = 0; k < 3; k++)	/* cube-box window */
@@ -429,6 +460,10 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
   numngb = 0;
   no = *startnode;
 
+#ifdef NGB_LIST_CACHE
+  offset = target * NgbMpart;
+#endif
+
   while(no >= 0)
     {
       if(no < All.MaxPart)	/* single particle */
@@ -436,37 +471,49 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 	  p = no;
 	  no = Nextnode[no];
 
-	  if(P[p].Type > 0)
-	    continue;
+          if(P[p].Type > 0)
+              continue;
+
+#ifdef NGB_LIST_CACHE          
+          if NGB_CACHE_GET_FLAG(target, p, offset) { 
+#endif
 
 #ifdef PERIODIC
-	  if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) < -hsml)
-	    continue;
-	  if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) > hsml)
-	    continue;
-	  if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) < -hsml)
-	    continue;
-	  if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) > hsml)
-	    continue;
-	  if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) < -hsml)
-	    continue;
-	  if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) > hsml)
-	    continue;
+	    if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) < -hsml)
+	      continue;
+	    if(NGB_PERIODIC_X(P[p].Pos[0] - searchcenter[0]) > hsml)
+	      continue;
+	    if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) < -hsml)
+	      continue;
+	    if(NGB_PERIODIC_Y(P[p].Pos[1] - searchcenter[1]) > hsml)
+	      continue;
+	    if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) < -hsml)
+	      continue;
+	    if(NGB_PERIODIC_Z(P[p].Pos[2] - searchcenter[2]) > hsml)
+	      continue;
 #else
-	  if(P[p].Pos[0] < searchmin[0])
-	    continue;
-	  if(P[p].Pos[0] > searchmax[0])
-	    continue;
-	  if(P[p].Pos[1] < searchmin[1])
-	    continue;
-	  if(P[p].Pos[1] > searchmax[1])
-	    continue;
-	  if(P[p].Pos[2] < searchmin[2])
-	    continue;
-	  if(P[p].Pos[2] > searchmax[2])
-	    continue;
+	    if(P[p].Pos[0] < searchmin[0])
+	      continue;
+	    if(P[p].Pos[0] > searchmax[0])
+	      continue;
+	    if(P[p].Pos[1] < searchmin[1])
+	      continue;
+	    if(P[p].Pos[1] > searchmax[1])
+	      continue;
+	    if(P[p].Pos[2] < searchmin[2])
+	      continue;
+	    if(P[p].Pos[2] > searchmax[2])
+	      continue;
 #endif
-	  Ngblist[numngb++] = p;
+	    Ngblist[numngb++] = p;
+
+#ifdef NGB_LIST_CACHE
+            NGB_CACHE_SET_FLAG(target, p);
+          } else {
+            NGB_CACHE_CLEAR_FLAG(target, p, offset);
+            Ngblist[numngb++] = p;          
+          }
+#endif
 
 	  if(numngb == MAX_NGB)
 	    {
@@ -475,7 +522,7 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 		{
 		  printf("ThisTask=%d: Need to do a second neighbour loop for (%g|%g|%g) hsml=%g no=%d\n",
 			 ThisTask, searchcenter[0], searchcenter[1], searchcenter[2], hsml, no);
-		  *startnode = no;
+		  *startnode = no;        
 		  return numngb;
 		}
 	    }
@@ -521,14 +568,12 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode)
 #endif
 	  no = this->u.d.nextnode;	/* ok, we need to open the node */
 	}
+      
     }
 
   *startnode = -1;
   return numngb;
 }
-
-
-
 
 /*! The buffer for the neighbour list has a finite length MAX_NGB. For a large
  *  search region, this buffer can get full, in which case this routine can be
@@ -569,8 +614,6 @@ int ngb_clear_buf(FLOAT searchcenter[3], FLOAT hsml, int numngb)
   return numngb;
 }
 
-
-
 /*! Allocates memory for the neighbour list buffer.
  */
 void ngb_treeallocate(int npart)
@@ -602,6 +645,36 @@ void ngb_treeallocate(int npart)
     }
   totbytes += bytes;
 
+#ifdef NGB_LIST_CACHE
+  NgbMpart = All.MaxPart>>5;
+  if (All.MaxPart&((1UL<<32)-1)) {
+    NgbMpart += 1;
+  }
+
+  if(!(NgblistCache = malloc(bytes = All.MaxPart * NgbMpart * sizeof(int))))
+    {
+      printf("Failed to allocate %g MB for ngblist cache array\n", bytes / (1024.0 * 1024.0));
+      endrun(78);
+    }
+  totbytes += bytes;
+#endif
+
+#ifdef GRAV_LIST_CACHE
+  GravMpart = All.MaxPart>>5;
+  if (All.MaxPart&((1UL<<32)-1)) {
+    GravMpart += 1;
+  }
+
+  if(!(GravlistCache = malloc(bytes = All.MaxPart * GravMpart * sizeof(int))))
+    {
+      printf("Failed to allocate %g MB for gravlist cache array\n", bytes / (1024.0 * 1024.0));
+      endrun(78);
+    }
+  totbytes += bytes;
+#endif
+
+
+
   if(ThisTask == 0)
     printf("allocated %g Mbyte for ngb search.\n", totbytes / (1024.0 * 1024.0));
 }
@@ -612,6 +685,13 @@ void ngb_treeallocate(int npart)
 void ngb_treefree(void)
 {
   free(Ngblist);
+#ifdef NGB_LIST_CACHE
+  free(NgblistCache);
+#endif
+#ifdef GRAV_LIST_CACHE
+  free(GravlistCache);
+#endif
+
 }
 
 /*! This function constructs the neighbour tree. To this end, we actually need
