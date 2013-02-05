@@ -28,6 +28,10 @@ void   density(void);
 void   density_decouple(void);
 void   density_evaluate(int i, int mode);
 
+#ifdef NGB_MULTI_SEARCH
+int   density_evaluate_multi(int p1, int p2, int mode);
+#endif
+
 void   distribute_file(int nfiles, int firstfile, int firsttask, int lasttask, int *filenr, int *master, int *last);
 double dmax(double, double);
 double dmin(double, double);

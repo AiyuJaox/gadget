@@ -64,6 +64,11 @@ void density(void)
   double timecomp = 0, timeimbalance = 0, timecommsumm = 0, sumimbalance;
   MPI_Status status;
 
+#ifdef NGB_MULTI_SEARCH
+  int idx, idy, p, p1, p2;
+  int len;
+#endif
+
 #ifdef PERIODIC
   boxSize = All.BoxSize;
   boxHalf = 0.5 * All.BoxSize;
@@ -102,8 +107,6 @@ void density(void)
     ntot += numlist[i];
   free(numlist);
 
-
-
   /* we will repeat the whole thing for those particles where we didn't
    * find enough neighbours
    */
@@ -119,21 +122,71 @@ void density(void)
 
 	  /* do local particles and prepare export list */
 	  tstart = second();
+#ifdef NGB_MULTI_SEARCH
+          memset(NgblistFlag, 0, All.MaxPart * (long) sizeof(int));
+#endif
 	  for(nexport = 0, ndone = 0; i < N_gas && nexport < All.BunchSizeDensity - NTask; i++)
 	    if(P[i].Ti_endstep == All.Ti_Current)
 	      {
+#ifndef NGB_MULTI_SEARCH
 		ndone++;
+#endif
 
-		for(j = 0; j < NTask; j++)
-		  Exportflag[j] = 0;
+#ifdef NGB_MULTI_SEARCH
+                if (NgblistFlag[i]) {
+                  continue;
+                } else {
+                  ndone++;
 
-		density_evaluate(i, 0);
+                  NgblistCount = 0;
+                  density_evaluate(i, 0);
+                  NgblistFlag[i] = 1;
+                  
+                  len = NgblistCount;
+                  idy = 0;
+                  for(idx = 0; idx < len; idx++) {
+                    p = Ngblist[idx];
+                    if (NgblistFlag[p] || P[p].Ti_endstep != All.Ti_Current) {
+	              continue;
+                    }
+                    NgblistMulti[idy] = p;
+                    idy++;  
+                  }
+                  len = idy;
+                  if (len < 2) continue;
+                  if (len & 1) len--;
+   
+                  for(idx = 0; idx < len; idx+=2) {
+                    
+                    p1 = NgblistMulti[idx];           
+                    p2 = NgblistMulti[idx + 1];
+                    
+                    /*if (Father[p1] != Father[p2]) {
+                      continue;
+                    }*/
+                    if (density_evaluate_multi(p1, p2, 0) == 0) {
+                      density_evaluate(p1, 0);
+                      density_evaluate(p2, 0);
+                    }
+                    NgblistFlag[p1] = 1;
+                    NgblistFlag[p2] = 1;
+                    ndone += 2;
+                    
+                  }
+	          
+                  continue;
+                }
+#else
+                density_evaluate(i, 0);
+#endif
+                for(j = 0; j < NTask; j++)
+                  Exportflag[j] = 0;
 
 		for(j = 0; j < NTask; j++)
 		  {
 		    if(Exportflag[j])
 		      {
-			DensDataIn[nexport].Pos[0] = P[i].Pos[0];
+                  	DensDataIn[nexport].Pos[0] = P[i].Pos[0];
 			DensDataIn[nexport].Pos[1] = P[i].Pos[1];
 			DensDataIn[nexport].Pos[2] = P[i].Pos[2];
 			DensDataIn[nexport].Vel[0] = SphP[i].VelPred[0];
@@ -149,6 +202,9 @@ void density(void)
 	      }
 	  tend = second();
 	  timecomp += timediff(tstart, tend);
+          TimeMultiSearch += timediff(tstart, tend);
+
+          printf("Multi search time: %.4f, %.4f\n", timediff(tstart, tend), TimeMultiSearch);
 
 	  qsort(DensDataIn, nexport, sizeof(struct densdata_in), dens_compare_key);
 
@@ -208,8 +264,12 @@ void density(void)
 
 
 	      tstart = second();
-	      for(j = 0; j < nbuffer[ThisTask]; j++)
+	      for(j = 0; j < nbuffer[ThisTask]; j++) {
 		density_evaluate(j, 1);
+#ifdef NGB_MULTI_SEARCH
+                // TODO
+#endif
+              }
 	      tend = second();
 	      timecomp += timediff(tstart, tend);
 
@@ -458,6 +518,479 @@ void density(void)
     }
 }
 
+#ifdef NGB_MULTI_SEARCH
+FLOAT ngb_center(FLOAT pos_m[3], FLOAT pos_m1[3], FLOAT pos[3], FLOAT pos1[3], FLOAT h, FLOAT h1, FLOAT *h2) {
+  FLOAT d, d1, d2, d3;
+  int i;
+  FLOAT p3[3], p4[3], p5[3], p6[3];
+
+  d = 0;
+  for(i = 0; i < 3; i++) {
+    d += (pos[i] - pos1[i]) * (pos[i] - pos1[i]);
+  }
+  d = sqrt(d);
+
+/*
+  if (d == 0) {
+    printf("NGB center warning: distance is zero, maybe stop?\n");
+    return 0;
+  }
+*/
+
+  d1 = d2 = d3 = 0;
+  for(i = 0; i < 3; i++) {
+    p3[i] = ((h + d) / d) * (pos[i] - pos1[i]) + pos1[i];
+    p4[i] = ((h1 + d) / d) * (pos1[i] - pos[i]) + pos[i];
+  
+    p5[i] = (h / d) * (pos1[i] - pos[i]) + pos[i];
+    p6[i] = (h1 / d) * (pos[i] - pos1[i]) + pos1[i];
+
+    pos_m[i] = (p3[i] + p4[i]) / 2;
+    pos_m1[i] = (p5[i] + p6[i]) / 2;
+
+    d1 += (pos[i] - p4[i]) * (pos[i] - p4[i]);
+    d2 += (pos1[i] - p3[i]) * (pos1[i] - p3[i]);
+    d3 += (pos_m1[i] - p5[i]) * (pos_m1[i] - p5[i]);
+  }
+  *h2 = d3;//sqrt(d3);
+ 
+  /*for(i = 0; i < 3; i++) {
+    pos_m[i] = (p3[i] + p4[i]) / 2;
+  }*/
+ 
+  /*d1 = 0;
+  for(i = 0; i < 3; i++) {
+    d1 += (pos[i] - p4[i]) * (pos[i] - p4[i]); 
+  }
+
+  d2 = 0;
+  for(i = 0; i < 3; i++) {
+    d2 += (pos1[i] - p3[i]) * (pos1[i] - p3[i]);
+  }
+*/
+  if (d1 < h * h) {
+    for(i = 0; i < 3; i++) {
+      pos_m[i] = pos[i];
+      pos_m1[i] = pos1[i];
+    }
+    d = h;
+    *h2 = h1;
+  } else if (d2 < h1 * h1) {
+    for(i = 0; i < 3; i++) {
+      pos_m[i] = pos1[i];
+      pos_m1[i] = pos[i];
+    }
+    d = h1;
+    *h2 = h;
+  } else {
+    d = 0;
+    for(i = 0; i < 3; i++) {
+      d += (p4[i] - pos_m[i]) * (p4[i] - pos_m[i]);
+    }
+    d = sqrt(d);
+  }
+
+  return d;
+}
+
+
+int density_evaluate_multi(int p1, int p2, int mode) {
+  int i, j, n, startnode, startnode1, numngb, numngb_inbox;
+  //int m, flag, diff1, diff2, numngb_inbox1, numngb_inbox2;
+  double d, h, h1, h2, h12, h_m, fac, hinv, hinv1, hinv3, hinv4, hinv13, hinv14;
+  double rho, divv, wk, dwk, rho1, divv1;
+  double dx, dy, dz, dx1, dy1, dz1, r, r2, r12, r22, u, mass_j;
+  double dvx, dvy, dvz, rotv[3], rotv1[3];
+  double weighted_numngb, dhsmlrho, weighted_numngb1, dhsmlrho1;
+  FLOAT *pos, *pos1, *vel, *vel1;
+  FLOAT pos_m[3], pos_m1[3];
+  FLOAT h3;
+
+  //int *multi_res, *p1_res, *p2_res;
+/*
+  multi_res = (int*)malloc(MAX_NGB * sizeof(int));
+  p1_res = (int*)malloc(MAX_NGB * sizeof(int));
+  p2_res = (int*)malloc(MAX_NGB * sizeof(int));
+*/
+  int target = p1;
+  int target1 = p2;
+
+  if(mode == 0)
+    {
+      pos = P[target].Pos;
+      vel = SphP[target].VelPred;
+      h = SphP[target].Hsml;
+
+      pos1 = P[target1].Pos;
+      vel1 = SphP[target1].VelPred;
+      h1 = SphP[target1].Hsml;
+    }
+  else
+    {
+      pos = DensDataGet[target].Pos;
+      vel = DensDataGet[target].Vel;
+      h = DensDataGet[target].Hsml;
+
+      pos1 = DensDataGet[target1].Pos;
+      vel1 = DensDataGet[target1].Vel;
+      h1 = DensDataGet[target1].Hsml;
+    }
+
+  d = 0;
+  for(i = 0; i < 3; i++) {
+    d += (pos[i] - pos1[i]) * (pos[i] - pos1[i]);
+  }
+  //d = sqrt(d); 
+  
+  if (d > 0.25 * (h * h1)) {
+    return 0;
+  }
+  h3 = 0;
+
+  h_m = ngb_center(&pos_m[0], &pos_m1[0], &pos[0], &pos1[0], h, h1, &h3);
+
+// target
+  h2 = h * h;
+  hinv = 1.0 / h;
+#ifndef  TWODIMS
+  hinv3 = hinv * hinv * hinv;
+#else
+  hinv3 = hinv * hinv / boxSize_Z;
+#endif
+  hinv4 = hinv3 * hinv;
+
+  rho = divv = rotv[0] = rotv[1] = rotv[2] = 0;
+  weighted_numngb = 0;
+  dhsmlrho = 0;
+
+  // target1
+  h12 = h1 * h1;
+  hinv1 = 1.0 / h1;
+#ifndef  TWODIMS
+  hinv13 = hinv1 * hinv1 * hinv1;
+#else
+  hinv13 = hinv1 * hinv1 / boxSize_Z;
+#endif
+  hinv14 = hinv13 * hinv1;
+
+  rho1 = divv1 = rotv1[0] = rotv1[1] = rotv1[2] = 0;
+  weighted_numngb1 = 0;
+  dhsmlrho1 = 0;
+
+  startnode = All.MaxPart;
+  numngb = 0;
+
+// target
+  do
+    {
+
+/*
+      numngb_inbox1 = ngb_treefind_variable(&pos[0], h, &startnode, target);
+
+      for(n = 0; n < numngb_inbox1; n++) {
+        p1_res[n] = Ngblist[n];
+      }
+
+      startnode = All.MaxPart;
+      numngb_inbox2 = ngb_treefind_variable(&pos1[0], h1, &startnode, target);
+      for(n = 0; n < numngb_inbox2; n++) {
+        p2_res[n] = Ngblist[n];
+      }
+*/
+      numngb_inbox = ngb_treefind_variable(&pos_m[0], h_m, &startnode, 0);
+ /*
+      for(n = 0; n < numngb_inbox; n++) {
+        multi_res[n] = Ngblist[n];
+      }
+
+      diff1 = 0;
+      for(n = 0; n < numngb_inbox1; n++) {
+        flag = 0;
+        for(m = 0; m < numngb_inbox; m++) {
+          if (p1_res[n] == multi_res[m]) {
+            flag = 1;
+            break;
+          }
+        }
+        if (flag == 0) {
+          diff1++;
+        }
+      }
+
+      diff2 = 0;
+      for(n = 0; n < numngb_inbox2; n++) {
+        flag = 0;
+        for(m = 0; m < numngb_inbox; m++) {
+          if (p2_res[n] == multi_res[m]) {
+            flag = 1;
+            break;
+          }
+        }
+        if (flag == 0) {
+          diff2++;
+        }
+      }
+      
+      printf("Ngb (%d, %d, %d), ", numngb_inbox1, numngb_inbox2, numngb_inbox);
+      printf("diff1 = %d, diff2 = %d\n", diff1, diff2);
+      if (diff1 != 0 || diff2 != 0) {
+        printf("NGB center warning: different of neighbors, maybe stop?\n");
+      }
+*/
+      int flg = 0;
+
+      for(n = 0; n < numngb_inbox; n++)
+        {
+          j = Ngblist[n];
+          //flg = 0;
+
+          // Intersection
+          dx = pos_m1[0] - P[j].Pos[0];
+          dy = pos_m1[1] - P[j].Pos[1];
+          dz = pos_m1[2] - P[j].Pos[2];
+          
+          r22 = dx * dx + dy * dy + dz * dz;
+
+          dx = pos[0] - P[j].Pos[0];
+          dy = pos[1] - P[j].Pos[1];
+          dz = pos[2] - P[j].Pos[2];
+
+#ifdef PERIODIC
+          if(dx > boxHalf_X)
+            dx -= boxSize_X;
+          if(dx < -boxHalf_X)
+            dx += boxSize_X;
+          if(dy > boxHalf_Y)
+            dy -= boxSize_Y;
+          if(dy < -boxHalf_Y)
+            dy += boxSize_Y;
+          if(dz > boxHalf_Z)
+            dz -= boxSize_Z;
+          if(dz < -boxHalf_Z)
+            dz += boxSize_Z;
+#endif
+
+          r2 = dx * dx + dy * dy + dz * dz;
+
+          dx1 = pos1[0] - P[j].Pos[0];
+          dy1 = pos1[1] - P[j].Pos[1];
+          dz1 = pos1[2] - P[j].Pos[2];
+
+#ifdef PERIODIC
+          if(dx1 > boxHalf_X)
+            dx1 -= boxSize_X;
+          if(dx1 < -boxHalf_X)
+            dx1 += boxSize_X;
+          if(dy1 > boxHalf_Y)
+            dy1 -= boxSize_Y;
+          if(dy1 < -boxHalf_Y)
+            dy1 += boxSize_Y;
+          if(dz1 > boxHalf_Z)
+            dz1 -= boxSize_Z;
+          if(dz1 < -boxHalf_Z)
+            dz1 += boxSize_Z;
+#endif
+          r12 = dx1 * dx1 + dy1 * dy1 + dz1 * dz1;
+
+          if (r22 <= h3 || (r2 < h2 && r12 < h12)) {
+            flg = 1;
+          } else {
+            if (r2 < h2) {
+              flg = 2;
+            } else if (r12 < h12) {
+              flg = 3;
+            }  
+          }
+         
+          if (flg == 0) continue;
+                    
+              if (flg != 3) {
+                r = sqrt(r2);
+                u = r * hinv;
+
+                if(u < 0.5)
+                  {
+                    wk = hinv3 * (KERNEL_COEFF_1 + KERNEL_COEFF_2 * (u - 1) * u * u);
+                    dwk = hinv4 * u * (KERNEL_COEFF_3 * u - KERNEL_COEFF_4);
+                  }
+                else
+                  {
+                    wk = hinv3 * KERNEL_COEFF_5 * (1.0 - u) * (1.0 - u) * (1.0 - u);
+                    dwk = hinv4 * KERNEL_COEFF_6 * (1.0 - u) * (1.0 - u);
+                  }
+
+                mass_j = P[j].Mass;
+                rho += mass_j * wk;
+                weighted_numngb += NORM_COEFF * wk / hinv3;
+                dhsmlrho += -mass_j * (NUMDIMS * hinv * wk + u * dwk);
+
+                if(r > 0)
+                  {
+                    fac = mass_j * dwk / r;
+                    dvx = vel[0] - SphP[j].VelPred[0];
+                    dvy = vel[1] - SphP[j].VelPred[1];
+                    dvz = vel[2] - SphP[j].VelPred[2];
+                    divv -= fac * (dx * dvx + dy * dvy + dz * dvz);
+                    rotv[0] += fac * (dz * dvy - dy * dvz);
+                    rotv[1] += fac * (dx * dvz - dz * dvx);
+                    rotv[2] += fac * (dy * dvx - dx * dvy);
+                  }
+              }
+ 
+              if (flg != 2) {
+                r = sqrt(r12);
+                u = r * hinv1;
+
+                if(u < 0.5)
+                  {
+                    wk = hinv13 * (KERNEL_COEFF_1 + KERNEL_COEFF_2 * (u - 1) * u * u);
+                    dwk = hinv14 * u * (KERNEL_COEFF_3 * u - KERNEL_COEFF_4);
+                  }
+                else
+                  {
+                    wk = hinv13 * KERNEL_COEFF_5 * (1.0 - u) * (1.0 - u) * (1.0 - u);
+                    dwk = hinv14 * KERNEL_COEFF_6 * (1.0 - u) * (1.0 - u);
+                  }
+
+                mass_j = P[j].Mass;
+                rho1 += mass_j * wk;
+                weighted_numngb1 += NORM_COEFF * wk / hinv13;
+                dhsmlrho1 += -mass_j * (NUMDIMS * hinv1 * wk + u * dwk);
+                if(r > 0)
+                  {
+                    fac = mass_j * dwk / r;
+                    dvx = vel1[0] - SphP[j].VelPred[0];
+                    dvy = vel1[1] - SphP[j].VelPred[1];
+                    dvz = vel1[2] - SphP[j].VelPred[2];
+                    divv1 -= fac * (dx1 * dvx + dy1 * dvy + dz1 * dvz);
+                    rotv1[0] += fac * (dz1 * dvy - dy1 * dvz);
+                    rotv1[1] += fac * (dx1 * dvz - dz1 * dvx);
+                    rotv1[2] += fac * (dy1 * dvx - dx1 * dvy);
+                  }
+              }
+           flg = 0;
+        }
+
+
+    }
+  while(startnode >= 0);
+
+  if(mode == 0)
+    {
+      SphP[target].NumNgb = weighted_numngb;
+      SphP[target].Density = rho;
+      SphP[target].DivVel = divv;
+      SphP[target].DhsmlDensityFactor = dhsmlrho;
+      SphP[target].Rot[0] = rotv[0];
+      SphP[target].Rot[1] = rotv[1];
+      SphP[target].Rot[2] = rotv[2];
+    }
+  else
+    {
+      DensDataResult[target].Rho = rho;
+      DensDataResult[target].Div = divv;
+      DensDataResult[target].Ngb = weighted_numngb;
+      DensDataResult[target].DhsmlDensity = dhsmlrho;
+      DensDataResult[target].Rot[0] = rotv[0];
+      DensDataResult[target].Rot[1] = rotv[1];
+      DensDataResult[target].Rot[2] = rotv[2];
+    }
+
+
+// target1
+/*  numngb = 0;
+  
+      startnode1 = -1; 
+      for(n = 0; n < numngb_inbox; n++)
+        {
+          j = Ngblist[n];
+ 
+          dx = pos1[0] - P[j].Pos[0];
+          dy = pos1[1] - P[j].Pos[1];
+          dz = pos1[2] - P[j].Pos[2];
+
+#ifdef PERIODIC 
+          if(dx > boxHalf_X)
+            dx -= boxSize_X;
+          if(dx < -boxHalf_X)
+            dx += boxSize_X;
+          if(dy > boxHalf_Y)
+            dy -= boxSize_Y;
+          if(dy < -boxHalf_Y)
+            dy += boxSize_Y;
+          if(dz > boxHalf_Z)
+            dz -= boxSize_Z;
+          if(dz < -boxHalf_Z)
+            dz += boxSize_Z;
+#endif
+
+
+          r2 = dx * dx + dy * dy + dz * dz;
+
+          if(r2 < h12)
+            {
+              numngb++;
+
+              r = sqrt(r2);
+              u = r * hinv1;
+
+              if(u < 0.5)
+                {
+                  wk = hinv13 * (KERNEL_COEFF_1 + KERNEL_COEFF_2 * (u - 1) * u * u);
+                  dwk = hinv14 * u * (KERNEL_COEFF_3 * u - KERNEL_COEFF_4);
+                }
+              else
+                {
+                  wk = hinv13 * KERNEL_COEFF_5 * (1.0 - u) * (1.0 - u) * (1.0 - u);
+                  dwk = hinv14 * KERNEL_COEFF_6 * (1.0 - u) * (1.0 - u);
+                }
+
+              mass_j = P[j].Mass;
+              rho1 += mass_j * wk;
+              weighted_numngb1 += NORM_COEFF * wk / hinv13;
+              dhsmlrho1 += -mass_j * (NUMDIMS * hinv1 * wk + u * dwk);
+              if(r > 0)
+                {
+                  fac = mass_j * dwk / r;
+                  dvx = vel1[0] - SphP[j].VelPred[0];
+                  dvy = vel1[1] - SphP[j].VelPred[1];
+                  dvz = vel1[2] - SphP[j].VelPred[2];
+                  divv1 -= fac * (dx * dvx + dy * dvy + dz * dvz);
+                  rotv1[0] += fac * (dz * dvy - dy * dvz);
+                  rotv1[1] += fac * (dx * dvz - dz * dvx);
+                  rotv1[2] += fac * (dy * dvx - dx * dvy);
+                }
+            }
+        }
+*/  
+  if(mode == 0)
+    {
+      SphP[target1].NumNgb = weighted_numngb1;
+      SphP[target1].Density = rho1;
+      SphP[target1].DivVel = divv1;
+      SphP[target1].DhsmlDensityFactor = dhsmlrho1;
+      SphP[target1].Rot[0] = rotv1[0];
+      SphP[target1].Rot[1] = rotv1[1];
+      SphP[target1].Rot[2] = rotv1[2];
+    }
+  else
+    {
+      DensDataResult[target1].Rho = rho1;
+      DensDataResult[target1].Div = divv1;
+      DensDataResult[target1].Ngb = weighted_numngb1;
+      DensDataResult[target1].DhsmlDensity = dhsmlrho1;
+      DensDataResult[target1].Rot[0] = rotv1[0];
+      DensDataResult[target1].Rot[1] = rotv1[1];
+      DensDataResult[target1].Rot[2] = rotv1[2];
+    }
+/*
+  free(multi_res);
+  free(p1_res); 
+  free(p2_res);
+*/
+  return 1;
+}
+#endif
 
 /*! This function represents the core of the SPH density computation. The
  *  target particle may either be local, or reside in the communication
@@ -509,7 +1042,9 @@ void density_evaluate(int target, int mode)
       ngb_search_startnode_variable(&pos[0], h, &startnode, target);
 #endif      
       numngb_inbox = ngb_treefind_variable(&pos[0], h, &startnode, target);
-
+#ifdef NGB_MULTI_SEARCH
+      NgblistCount = numngb_inbox;
+#endif
       for(n = 0; n < numngb_inbox; n++)
 	{
 	  j = Ngblist[n];

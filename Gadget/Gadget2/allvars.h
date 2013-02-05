@@ -125,6 +125,7 @@ typedef  long long  peanokey;    /*!< defines the variable type used for Peano-H
 #endif
 
 
+extern double TimeMultiSearch;
 
 extern int ThisTask;		/*!< the rank of the local processor */
 extern int NTask;               /*!< number of processors */
@@ -158,6 +159,14 @@ extern int NgbMpart;      /*!< Number of neighbors in bits represents */
 #ifdef GRAV_LIST_CACHE
 extern int *GravlistCache;      /*!< Buffer to hold indices of particles retrieved by the gravitational interaction routines */
 extern int GravMpart;      /*!< Number of particles in bits represents */
+#endif
+
+#ifdef NGB_MULTI_SEARCH
+extern int *NgblistMulti;
+extern int NgblistCount;
+extern int *NgblistFlag;
+extern int *Ngblist1;
+extern int NgblistCount1;
 #endif
 
 

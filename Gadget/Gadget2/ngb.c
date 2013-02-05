@@ -442,7 +442,6 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
   int no, p;
   struct NODE *this;
   FLOAT searchmin[3], searchmax[3];
-
 #ifdef PERIODIC
   double xtmp;
 #endif
@@ -466,6 +465,7 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
 
   while(no >= 0)
     {
+
       if(no < All.MaxPart)	/* single particle */
 	{
 	  p = no;
@@ -505,7 +505,8 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
 	    if(P[p].Pos[2] > searchmax[2])
 	      continue;
 #endif
-	    Ngblist[numngb++] = p;
+	    Ngblist[numngb] = p;
+            numngb++;
 
 #ifdef NGB_LIST_CACHE
             NGB_CACHE_SET_FLAG(target, p);
@@ -518,7 +519,7 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
 	  if(numngb == MAX_NGB)
 	    {
 	      numngb = ngb_clear_buf(searchcenter, hsml, numngb);
-	      if(numngb == MAX_NGB)
+ 	      if(numngb == MAX_NGB)
 		{
 		  printf("ThisTask=%d: Need to do a second neighbour loop for (%g|%g|%g) hsml=%g no=%d\n",
 			 ThisTask, searchcenter[0], searchcenter[1], searchcenter[2], hsml, no);
@@ -539,6 +540,7 @@ int ngb_treefind_variable(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int
 	  this = &Nodes[no];
 
 	  no = this->u.d.sibling;	/* in case the node can be discarded */
+
 #ifdef PERIODIC
 	  if((NGB_PERIODIC_X(this->center[0] - searchcenter[0]) + 0.5 * this->len) < -hsml)
 	    continue;
@@ -644,6 +646,28 @@ void ngb_treeallocate(int npart)
       endrun(78);
     }
   totbytes += bytes;
+
+#ifdef NGB_MULTI_SEARCH
+  if(!(NgblistMulti = malloc(bytes = npart * (long) sizeof(int))))
+    {
+      printf("Failed to allocate %g MB for ngb multi list array\n", bytes / (1024.0 * 1024.0));
+      endrun(78);
+    }
+  totbytes += bytes;
+  if(!(NgblistFlag = malloc(bytes = All.MaxPart * (long) sizeof(int))))
+    {
+      printf("Failed to allocate %g MB for ngb flag list array\n", bytes / (1024.0 * 1024.0));
+      endrun(78);
+    }
+  totbytes += bytes;
+  if(!(Ngblist1 = malloc(bytes = npart * (long) sizeof(int))))
+    {
+      printf("Failed to allocate %g MB for ngblist1 array\n", bytes / (1024.0 * 1024.0));
+      endrun(78);
+    }
+  totbytes += bytes;
+#endif
+
 
 #ifdef NGB_LIST_CACHE
   NgbMpart = All.MaxPart>>5;

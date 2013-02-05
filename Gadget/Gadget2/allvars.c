@@ -7,6 +7,7 @@
 #include "tags.h"
 #include "allvars.h"
 
+double TimeMultiSearch = 0;
 
 int ThisTask;		/*!< the rank of the local processor */
 int NTask;               /*!< number of processors */
@@ -39,6 +40,14 @@ int NgbMpart = 0;
 #ifdef GRAV_LIST_CACHE
 int *GravlistCache;    /*!< Buffer to hold indices of particles retrieved by the gravitational interaction routines */
 int GravMpart = 0;
+#endif
+
+#ifdef NGB_MULTI_SEARCH
+int *NgblistMulti;
+int NgblistCount;
+int *NgblistFlag;
+int *Ngblist1;
+int NgblistCount1;
 #endif
 
 int TreeReconstructFlag; /*!< Signals that a new tree needs to be constructed */
