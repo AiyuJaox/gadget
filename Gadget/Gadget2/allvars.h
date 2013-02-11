@@ -126,6 +126,9 @@ typedef  long long  peanokey;    /*!< defines the variable type used for Peano-H
 
 
 extern double TimeMultiSearch;
+extern int AvgLenPath;
+extern int BaseAlgCount;
+extern int MultiAlgCount;
 
 extern int ThisTask;		/*!< the rank of the local processor */
 extern int NTask;               /*!< number of processors */

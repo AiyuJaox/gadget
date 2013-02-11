@@ -67,6 +67,11 @@ void density(void)
 #ifdef NGB_MULTI_SEARCH
   int idx, idy, p, p1, p2;
   int len;
+  //double ro_part;
+#ifdef NGB_MULTI_SEARCH_GROUP  
+  double d;
+  int ii, main_flag, pt;
+#endif
 #endif
 
 #ifdef PERIODIC
@@ -143,6 +148,13 @@ void density(void)
                   NgblistFlag[i] = 1;
                   
                   len = NgblistCount;
+                  
+                  //printf("Ro: %d, %f, %f\n", len, SphP[i].Hsml, ((double)len / SphP[i].Hsml));
+                  // Density of neighbors
+                  /*if ((double)len / SphP[i].Hsml < 0.015) {
+                    continue;
+                  }*/
+       
                   idy = 0;
                   for(idx = 0; idx < len; idx++) {
                     p = Ngblist[idx];
@@ -155,7 +167,46 @@ void density(void)
                   len = idy;
                   if (len < 2) continue;
                   if (len & 1) len--;
-   
+
+#ifdef NGB_MULTI_SEARCH_GROUP   
+                  // Fandorin Get two particle
+                  main_flag = 0; 
+                  for(idx = 0; idx < len; idx+=2) {
+                    p1 = NgblistMulti[idx];
+                    p2 = NgblistMulti[idx + 1];
+
+                    d = 0;
+                    for(ii = 0; ii < 3; ii++) {
+                      d += (P[p1].Pos[ii] - P[p2].Pos[ii]) * (P[p1].Pos[ii] - P[p2].Pos[ii]);
+                    }
+                    d = sqrt(d);
+                    // Check distance between of the centers
+                    if (d > 0.5 * (SphP[p1].Hsml + SphP[p2].Hsml)) {
+                     // printf("Continue!\n");
+                      continue;
+                    } 
+                    main_flag = 1;
+                    break;
+                  }
+
+                  if (main_flag == 0 && len != 0) {
+                    printf("OPA!!!\n");
+                  }
+                  if (main_flag) {
+                    density_evaluate_group(p1, p2);
+                    /*idy = 0; 
+                    for(idx = 0; idx < len; idx++) {
+                      pt = NgblistMulti[idx];
+                      if (pt == p1 || pt == p2) continue;
+                      for(ii = 0; ii < 3; ii++) {
+                        d += (P[pt].Pos[ii] - P[p_m].Pos[ii]) * (P[pt].Pos[ii] - P[p_m].Pos[ii]);
+                      } 
+                      if () 
+                      NgblistMultiGroup[idy] = pt;
+                      idy++;
+                    }*/
+                  }
+#endif
                   for(idx = 0; idx < len; idx+=2) {
                     
                     p1 = NgblistMulti[idx];           
@@ -593,6 +644,43 @@ FLOAT ngb_center(FLOAT pos_m[3], FLOAT pos_m1[3], FLOAT pos[3], FLOAT pos1[3], F
   return d;
 }
 
+#ifdef NGB_MULTI_SEARCH_GROUP
+int density_evaluate_multi_group(int p1, int p2, int mode) {
+  int i, j, n, startnode, startnode1, numngb, numngb_inbox;
+  double d, h, h1, h2, h12, h_m, fac, hinv, hinv1, hinv3, hinv4, hinv13, hinv14;
+  double rho, divv, wk, dwk, rho1, divv1;
+  double dx, dy, dz, dx1, dy1, dz1, r, r2, r12, r22, u, mass_j;
+  double dvx, dvy, dvz, rotv[3], rotv1[3];
+  double weighted_numngb, dhsmlrho, weighted_numngb1, dhsmlrho1;
+  FLOAT *pos, *pos1, *vel, *vel1;
+  FLOAT pos_m[3], pos_m1[3];
+  FLOAT h3;
+
+  int target = p1;
+  int target1 = p2;
+
+  if(mode == 0) {
+    pos = P[target].Pos;
+    vel = SphP[target].VelPred;
+    h = SphP[target].Hsml;
+
+    pos1 = P[target1].Pos;
+    vel1 = SphP[target1].VelPred;
+    h1 = SphP[target1].Hsml;
+  } else {
+    pos = DensDataGet[target].Pos;
+    vel = DensDataGet[target].Vel;
+    h = DensDataGet[target].Hsml;
+
+    pos1 = DensDataGet[target1].Pos;
+    vel1 = DensDataGet[target1].Vel;
+    h1 = DensDataGet[target1].Hsml;
+  }
+
+
+
+}
+#endif
 
 int density_evaluate_multi(int p1, int p2, int mode) {
   int i, j, n, startnode, startnode1, numngb, numngb_inbox;
@@ -606,7 +694,7 @@ int density_evaluate_multi(int p1, int p2, int mode) {
   FLOAT pos_m[3], pos_m1[3];
   FLOAT h3;
 
-  //int *multi_res, *p1_res, *p2_res;
+  int *multi_res, *p1_res, *p2_res;
 /*
   multi_res = (int*)malloc(MAX_NGB * sizeof(int));
   p1_res = (int*)malloc(MAX_NGB * sizeof(int));
@@ -640,11 +728,15 @@ int density_evaluate_multi(int p1, int p2, int mode) {
   for(i = 0; i < 3; i++) {
     d += (pos[i] - pos1[i]) * (pos[i] - pos1[i]);
   }
-  //d = sqrt(d); 
+  d = sqrt(d); 
   
-  if (d > 0.25 * (h * h1)) {
+  if (d > 0.25 * (h + h1)) {
     return 0;
   }
+
+  //MultiAlgCount++; 
+  //printf("MultiAlgCount: %d\n", MultiAlgCount);
+
   h3 = 0;
 
   h_m = ngb_center(&pos_m[0], &pos_m1[0], &pos[0], &pos1[0], h, h1, &h3);
@@ -1018,6 +1110,9 @@ void density_evaluate(int target, int mode)
       vel = DensDataGet[target].Vel;
       h = DensDataGet[target].Hsml;
     }
+
+  //BaseAlgCount++;
+  //printf("BaseAlgCount: %d\n", BaseAlgCount);
 
   h2 = h * h;
   hinv = 1.0 / h;

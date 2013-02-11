@@ -209,8 +209,11 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int ta
   offset = target * NgbMpart;
 #endif
 
+  AvgLenPath = -1;
+
   while(no >= 0)
     {
+      AvgLenPath++;
       if(no < All.MaxPart)	/* single particle */
 	{
 	  p = no;
@@ -320,6 +323,7 @@ int ngb_treefind_pairs(FLOAT searchcenter[3], FLOAT hsml, int *startnode, int ta
 	}
     }
 
+  printf("Len Path: %d\n", AvgLenPath);
   *startnode = -1;
   return numngb;
 }

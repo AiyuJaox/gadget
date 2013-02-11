@@ -8,6 +8,9 @@
 #include "allvars.h"
 
 double TimeMultiSearch = 0;
+int AvgLenPath = -1;
+int BaseAlgCount = 0;
+int MultiAlgCount = 0;
 
 int ThisTask;		/*!< the rank of the local processor */
 int NTask;               /*!< number of processors */

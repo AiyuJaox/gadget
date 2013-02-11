@@ -76,7 +76,13 @@ OPT   +=  -DHAVE_HDF5
 #OPT   +=  -DNGB_LIST_CACHE
 
 #--------------------------------------- Grav list for cache
-OPT   +=  -DGRAV_LIST_CACHE
+#OPT   +=  -DGRAV_LIST_CACHE
+
+#--------------------------------------- Multi ngb search
+OPT   +=  -DNGB_MULTI_SEARCH
+#OPT   +=  -DNGB_MULTI_SEARCH_GROUP
+
+
 
 #----------------------------------------------------------------------
 # Here, select compile environment for the target machine. This may need 
